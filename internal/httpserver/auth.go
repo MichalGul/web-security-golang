@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bootdotdev/learn-web-security/internal/accounts"
@@ -232,12 +233,30 @@ func parseForm(_ int64, renderer *templates.Renderer) middleware {
 	}
 }
 
+func formatTimestamp(timestamp time.Time) string {
+	return timestamp.UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
 func (handler *authHandler) Logout(responseWriter http.ResponseWriter, request *http.Request) {
+	currentSession, current, err := sessions.Current(request, handler.accounts)
+	if err != nil {
+		handler.internalError(responseWriter, request, err)
+		return
+	}
+	if current {
+		err := handler.accounts.RevokeSession(request.Context(), currentSession.Session.Token)
+		if err != nil {
+			handler.internalError(responseWriter, request, err)
+			return
+		}
+	}
+
 	challengeToken := totpLoginChallengeToken(request)
 	if err := handler.mfa.DeleteChallenge(request.Context(), challengeToken); err != nil {
 		handler.internalError(responseWriter, request, err)
 		return
 	}
+
 	sessions.ClearCookie(responseWriter)
 	if challengeToken != "" {
 		clearTOTPLoginChallengeCookie(responseWriter)
