@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/bootdotdev/learn-web-security/internal/accounts"
 	"github.com/bootdotdev/learn-web-security/internal/auth/sessions"
@@ -95,6 +96,24 @@ func (handler *Handler) Products(responseWriter http.ResponseWriter, request *ht
 }
 
 func (handler *Handler) WarehouseOrders(responseWriter http.ResponseWriter, request *http.Request) {
+
+	apiKeyHeaderValue := request.Header.Get("X-API-Key")
+	apiKey, valid, err := handler.apiStore.FindKey(request.Context(),apiKeyHeaderValue)
+	if err != nil {
+		handler.internalError(responseWriter, request, err)
+		return
+	}
+	if !valid {
+		httpx.RespondWithJSON(responseWriter, http.StatusUnauthorized, map[string]string{"error": "Invalid API key"})
+		return
+	}
+
+	if strings.Contains(apiKey.Scope, "orders:read") != true {
+		httpx.RespondWithJSON(responseWriter, http.StatusForbidden, map[string]string{"error":"action forbidden"})
+
+	} 
+
+	
 	orders, err := handler.orderStore.ListAll(request.Context())
 	if err != nil {
 		handler.internalError(responseWriter, request, err)

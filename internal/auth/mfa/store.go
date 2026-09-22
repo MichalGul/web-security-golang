@@ -129,7 +129,34 @@ func verifyAt(code, secret string, timestamp time.Time) bool {
 }
 
 func (store *Store) VerifyAndConsume(ctx context.Context, userID int64, code, secret string) (bool, error) {
-	return verifyAt(code, secret, store.now()), nil
+	currentTime := store.now()
+	verified := verifyAt(code, secret, currentTime)
+
+	if !verified {
+		return false, nil
+	}
+
+	current30TimeStep := currentTime.Unix() / totpPeriodSeconds 
+	
+	result, err :=store.queries.ConsumeTOTPStep(ctx,dbgen.ConsumeTOTPStepParams{
+		TimeStep: &current30TimeStep,
+		UserID:   userID,
+	})
+
+	if err != nil {
+		return false, fmt.Errorf("consume TOTP step: %w", err)
+	}
+
+	rowsAffected, dbErr := result.RowsAffected()
+	if dbErr != nil {
+		return false, dbErr
+	}
+
+	if rowsAffected != 1 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (store *Store) ConfirmEnrollment(ctx context.Context, userID int64) ([]string, error) {
