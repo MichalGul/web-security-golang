@@ -87,7 +87,7 @@ func (handler *Handler) Upload(responseWriter http.ResponseWriter, request *http
 }
 
 func (handler *Handler) Download(responseWriter http.ResponseWriter, request *http.Request) {
-	_, ok := handler.requireAuth(responseWriter, request)
+	current, ok := handler.requireAuth(responseWriter, request)
 	if !ok {
 		return
 	}
@@ -97,6 +97,7 @@ func (handler *Handler) Download(responseWriter http.ResponseWriter, request *ht
 		return
 	}
 	file, found, err := handler.store.FindByID(request.Context(), fileID)
+
 	if err != nil {
 		handler.internalError(responseWriter, request, err)
 		return
@@ -105,7 +106,16 @@ func (handler *Handler) Download(responseWriter http.ResponseWriter, request *ht
 		handler.fileNotFound(responseWriter)
 		return
 	}
-	http.Redirect(responseWriter, request, CreateSignedDownloadPath(handler.downloadSigningKey, file.ID, handler.now()), http.StatusFound)
+
+
+
+
+	if (file.UserID == current.User.ID) || current.User.Role == "support" || current.User.Role == "admin" {
+		http.Redirect(responseWriter, request, CreateSignedDownloadPath(handler.downloadSigningKey, file.ID, handler.now()), http.StatusFound)
+	} else {
+		handler.fileNotFound(responseWriter)
+		return
+	}
 }
 
 func (handler *Handler) SignedDownload(responseWriter http.ResponseWriter, request *http.Request) {
