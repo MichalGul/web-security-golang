@@ -3,6 +3,8 @@ package reviews
 import (
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/bootdotdev/learn-web-security/internal/accounts"
 	"github.com/bootdotdev/learn-web-security/internal/auth/sessions"
@@ -158,7 +160,7 @@ func (handler *Handler) Delete(responseWriter http.ResponseWriter, request *http
 	http.Redirect(responseWriter, request, "/account/reviews", http.StatusFound)
 }
 
-func (handler *Handler) requireReview( userID int64, responseWriter http.ResponseWriter, request *http.Request) (Review, bool) {
+func (handler *Handler) requireReview(userID int64, responseWriter http.ResponseWriter, request *http.Request) (Review, bool) {
 	reviewID, valid := httpx.ParseSafeInteger(request.PathValue("id"))
 
 	if !valid {
@@ -240,5 +242,9 @@ func parseRating(value string) (int64, bool) {
 }
 
 func parseBody(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCount([]byte(value)) == 0 || utf8.RuneCount([]byte(value)) > 1000 {
+		return value, false
+	}
 	return value, value != ""
 }
