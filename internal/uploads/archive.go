@@ -72,6 +72,17 @@ func ExtractTaxDocumentArchive(encryptionKeyring Keyring, contents []byte, extra
 	plannedEntries := make([]plannedArchiveEntry, 0, len(archiveReader.File))
 	for _, entry := range archiveReader.File {
 		entryDestination := filepath.Join(importDirectory, entry.Name)
+
+		isSafe, err := isInsideDirectory(importDirectory, entryDestination)
+		if err != nil {
+			return ExtractedTaxDocumentArchive{}, fmt.Errorf("failed to check if entry is safe: %w", err)
+		}
+		if !isSafe || entry.FileInfo().Mode()&os.ModeSymlink != 0 || strings.Contains(entry.Name, "\\") ||  filepath.IsAbs(entry.Name) {
+			return ExtractedTaxDocumentArchive{}, &ArchiveImportError{Message: "Choose a valid ZIP archive.", StatusCode: 400}
+		}
+
+	
+
 		if isIgnoredArchiveEntry(entry.Name) {
 			continue
 		}
@@ -79,6 +90,8 @@ func ExtractTaxDocumentArchive(encryptionKeyring Keyring, contents []byte, extra
 			plannedEntries = append(plannedEntries, plannedArchiveEntry{directory: true, destination: entryDestination})
 			continue
 		}
+
+
 		entryContents, err := readArchiveEntry(entry)
 		if err != nil {
 			return ExtractedTaxDocumentArchive{}, &ArchiveImportError{Message: "Choose a valid ZIP archive.", StatusCode: 400}
@@ -190,4 +203,24 @@ func discardArchiveAfterWriteFailure(archive ExtractedTaxDocumentArchive, err er
 		return ExtractedTaxDocumentArchive{}, errors.Join(err, discardErr)
 	}
 	return ExtractedTaxDocumentArchive{}, err
+}
+
+
+func isInsideDirectory(baseDir, targetPath string) (bool, error) {
+	absBaseDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return false, fmt.Errorf("failed to get absolute path of base directory: %w", err)
+	}
+
+	absTargetPath, err := filepath.Abs(targetPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to get absolute path of target path: %w", err)
+	}
+
+	relPath, err := filepath.Rel(absBaseDir, absTargetPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to compute relative path: %w", err)
+	}
+
+	return !strings.HasPrefix(relPath, ".."+string(filepath.Separator)) && relPath != ".." && relPath != ".", nil
 }
