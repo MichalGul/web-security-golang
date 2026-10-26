@@ -127,11 +127,11 @@ func requestedOrderID(message string) (int64, bool) {
 	return orderID, true
 }
 
-func requestedUserID(message string) (int64, bool) {
-	match := userNumberPattern.FindStringSubmatch(message)
-	if len(match) != 2 {
-		return 1, true
-	}
-	userID, valid := httpx.ParseSafeInteger(match[1])
-	return userID, valid && userID > 0
-}
+//func requestedUserID(message string) (int64, bool) {
+	//match := userNumberPattern.FindStringSubmatch(message)
+	//if len(match) != 2 {
+		//return 1, true
+	//}
+	//userID, valid := httpx.ParseSafeInteger(match[1])
+	//return userID, valid && userID > 0
+//}
