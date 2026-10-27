@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ func applyMiddleware(handler http.Handler, middlewareChain ...middleware) http.H
 	for _, currentMiddleware := range slices.Backward(middlewareChain) {
 		handler = currentMiddleware(handler)
 	}
+	
 	return handler
 }
 
@@ -67,6 +69,38 @@ func cspNonce(next http.Handler) http.Handler {
 		next.ServeHTTP(responseWriter, request)
 	})
 }
+
+func CSRFProtection(appOrigin string, renderer *templates.Renderer) middleware {
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodPost{
+				next.ServeHTTP(responseWriter, request)
+				return
+			}
+			origin := request.Header.Get("Origin")
+			if origin == "" {
+				u, err := url.Parse(request.Header.Get("Referer"))
+				if u.Scheme == "" || u.Host == "" || err != nil {
+					httpx.RespondWithErrorPage(responseWriter, renderer, http.StatusForbidden, "Invalid Referer", "The referer header is invalid")
+					return
+				}
+				origin = u.Scheme + "://" + u.Host
+			}
+
+			if origin != appOrigin {
+				fmt.Printf("CSRF protection: invalid origin %q, expected %q\n", origin, appOrigin)
+				httpx.RespondWithErrorPage(responseWriter, renderer, http.StatusForbidden, "Invalid Origin", "Invalid Origin")
+				return
+			}
+
+			next.ServeHTTP(responseWriter, request)
+
+		
+			})
+		}
+	}
+
 
 func recoverPanics(logger *logging.Logger, renderer *templates.Renderer) middleware {
 	return func(next http.Handler) http.Handler {
